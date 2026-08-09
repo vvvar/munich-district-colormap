@@ -33,22 +33,22 @@ Both are joined by the official code `bt_nummer` (e.g. `"09.1"`). The sync scrip
 ## How it works
 
 ```
-                    ┌──────────────────── Notion ────────────────────┐
-                    │  "Munich Sub-Districts (110)"  (Color + Notes) │
-                    └───────────────────────┬────────────────────────┘
-                                            │  sync_notion_districts.py
-                                            ▼
-GeodatenService München WFS ─┐            repo data
+               ┌──────────────────── Notion ────────────────────┐
+               │  "Munich Sub-Districts (110)"  (Color + Notes) │
+               └───────────────────────┬────────────────────────┘
+                                       │  read by bake.py (ratings only)
+                                       ▼
+GeodatenService München WFS ─┐         repo data (committed)
   vablock_bezirksteil (poly) ─┼─► fetch_districts.py ─► munich_bezirksteile_named.geojson
-OpenStreetMap (named places) ─┘      (point-in-polygon)    munich_districts_detail.md
-                                                        │
-                                                        ▼  bake.py
-                                                   index.html ──► gh-pages ──► GitHub Pages
+OpenStreetMap (named places) ─┘    (run locally, on demand)    munich_districts_detail.md
+                                                             │
+                                                             ▼  bake.py
+                                                        index.html ──► gh-pages ──► GitHub Pages
 ```
 
-1. **`fetch_districts.py`** pulls the official 110 sub-district polygons from the GeodatenService München WFS (reprojected server-side to WGS84) and the named suburb/quarter/neighbourhood centroids from OpenStreetMap. Each OSM name is attached to the official polygon that contains its centroid (priority: suburb > quarter > neighbourhood). Output: `munich_bezirksteile_named.geojson` + a human-readable `munich_districts_detail.md`.
-2. **`sync_notion_districts.py`** makes the Notion database match the repo data. First run creates "Munich Sub-Districts (110)" under the "Munich Districts Map" page and seeds all 110 rows (carrying down the archived borough colors). Later runs are idempotent upserts keyed by `Code` — metadata is refreshed, `Color`/`Notes` untouched.
-3. **`bake.py`** embeds the GeoJSON and the current colors from Notion into a single static `index.html`.
+1. **`fetch_districts.py`** pulls the official 110 sub-district polygons from the GeodatenService München WFS (reprojected server-side to WGS84) and the named suburb/quarter/neighbourhood centroids from OpenStreetMap. Each OSM name is attached to the official polygon that contains its centroid (priority: suburb > quarter > neighbourhood). Output: `munich_bezirksteile_named.geojson` + a human-readable `munich_districts_detail.md`. **Run it locally, on demand** (the OSM endpoint is rate-limited and flaky from CI), and commit the result. It falls back to the previously committed OSM names if Overpass is unreachable.
+2. **`sync_notion_districts.py`** makes the Notion database match the committed repo data. First run creates "Munich Sub-Districts (110)" under the "Munich Districts Map" page and seeds all 110 rows (carrying down the archived borough colors). Later runs are idempotent upserts keyed by `Code` — metadata is refreshed, `Color`/`Notes` untouched.
+3. **`bake.py`** embeds the committed GeoJSON and the current colors from Notion into a single static `index.html`.
 4. A GitHub Actions workflow publishes `index.html` to the `gh-pages` branch, which GitHub Pages serves. `main` stays clean (source only). The live page can be embedded in Notion.
 
 ## Setup
@@ -91,7 +91,7 @@ open index.html
 - `sync_notion_districts.py` — creates/seeds + idempotently syncs the Notion database
 - `bake.py` — fetches colors from Notion and renders `index.html` (includes the marks feature)
 - `.github/workflows/sync.yml` — rebuild + deploy the map (every 10 min, on push, or via **Run workflow**)
-- `.github/workflows/sync-notion.yml` — refresh district data + sync to Notion (weekly or via **Run workflow**)
+- `.github/workflows/sync-notion.yml` — sync repo metadata to the Notion database (weekly or via **Run workflow**)
 - `munich_bezirksteile_named.geojson` — generated district data (committed)
 - `munich_districts_detail.md` — generated district table (committed)
 - `paths.json`, `stadtbezirke.geojson` — legacy 25-district assets, superseded by the sub-district data
