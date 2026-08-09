@@ -325,7 +325,7 @@ def main():
         "var c=na.localeCompare(nb,'en');return c||ord;}"
         "if(mode==='rating'){var ra=isFinite(RATING[a.dataset.ref])?RATING[a.dataset.ref]:0,"
         "rb=isFinite(RATING[b.dataset.ref])?RATING[b.dataset.ref]:0;"
-        "return (ra-rb)||ord;}"
+        "return (rb-ra)||ord;}"
         "return ord;});"
         "var list=document.getElementById('districts');"
         "rows.forEach(function(r){list.appendChild(r);});}\n"
