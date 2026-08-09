@@ -11,7 +11,6 @@ DB_ID = os.environ.get("NOTION_DB_ID")
 TOKEN = os.environ.get("NOTION_TOKEN", "")
 
 RATING_HEX = {0: "#d3d9e0", 1: "#e6194b", 2: "#f58231", 3: "#ffe119", 4: "#a4d65e", 5: "#3cb44b"}
-COLOR_TO_RATING = {"Grey": 0, "Red": 1, "Yellow": 3, "Green": 5}
 
 TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 ATTRIB = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -63,13 +62,20 @@ def fetch_ratings():
             note = "".join(t.get("plain_text", "") for t in props["Notes"]["rich_text"]).strip()
             rating = 0
             if "Rating" in props:
-                num = props["Rating"].get("number")
-                if isinstance(num, (int, float)) and 0 <= num <= 5:
-                    rating = int(num)
-            else:
-                # legacy `Color` select fallback during a transition window
-                sel = props.get("Color", {}).get("select") or {}
-                rating = COLOR_TO_RATING.get(sel.get("name"), 0)
+                sel = props["Rating"].get("select") or {}
+                name = sel.get("name")
+                if name is not None:
+                    try:
+                        v = int(name)
+                        if 0 <= v <= 5:
+                            rating = v
+                    except (TypeError, ValueError):
+                        pass
+                else:
+                    # numeric transition window
+                    num = props["Rating"].get("number")
+                    if isinstance(num, (int, float)) and 0 <= num <= 5:
+                        rating = int(num)
             if key:
                 ratings[key] = {
                     "rating": rating,

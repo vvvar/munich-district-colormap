@@ -49,7 +49,7 @@ OpenStreetMap (named places) ─┘    (run locally, on demand)    munich_distri
 ```
 
 1. **`fetch_districts.py`** pulls the official 110 sub-district polygons from the GeodatenService München WFS (reprojected server-side to WGS84) and the named suburb/quarter/neighbourhood centroids from OpenStreetMap. Each OSM name is attached to the official polygon that contains its centroid (priority: suburb > quarter > neighbourhood). Output: `munich_bezirksteile_named.geojson` + a human-readable `munich_districts_detail.md`. **Run it locally, on demand** (the OSM endpoint is rate-limited and flaky from CI), and commit the result. It falls back to the previously committed OSM names if Overpass is unreachable.
-2. **`sync_notion_districts.py`** makes the Notion database match the committed repo data. First run creates "Munich Sub-Districts (110)" under the "Munich Districts Map" page and seeds all 110 rows with `Rating` = 0 (Explore). If an existing database still has the legacy `Color` column, it is migrated once to `Rating` (Grey→0, Red→1, Yellow→3, Green→5). Later runs are idempotent upserts keyed by `Code` — metadata is refreshed, `Rating`/`Notes` untouched.
+2. **`sync_notion_districts.py`** makes the Notion database match the committed repo data. First run creates "Munich Sub-Districts (110)" under the "Munich Districts Map" page and seeds all 110 rows with `Rating` = 0 (Explore). If an existing database still has a legacy numeric `Rating` column, it is migrated once to the `Rating` select (0–5). Later runs are idempotent upserts keyed by `Code` — metadata is refreshed, `Rating`/`Notes` untouched.
 3. **`bake.py`** embeds the committed GeoJSON and the current ratings from Notion into a single static `index.html`.
 4. A GitHub Actions workflow publishes `index.html` to the `gh-pages` branch, which GitHub Pages serves. `main` stays clean (source only). The live page can be embedded in Notion.
 
@@ -73,7 +73,7 @@ The Notion database schema (created automatically by the sync):
 | Name | title | e.g. `Neuhausen (09.1)` |
 | Code | rich text | the `bt_nummer`, join key (e.g. `09.1`) |
 | Borough | rich text | the parent Stadtbezirk name |
-| Rating | number | 0–5 (Explore / No go / Meh / Compromise / Nice / Like) — **edit by hand** |
+| Rating | select | dropdown 0–5 (Explore / No go / Meh / Compromise / Nice / Like) — **edit by hand** |
 | Notes | rich text | **edit by hand** |
 | Area km² | number | derived |
 | Centroid Lat / Lng | number | derived |
