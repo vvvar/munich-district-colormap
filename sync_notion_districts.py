@@ -33,7 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
-PARENT_PAGE_ID = "3b73e55d-d52c-8123-b3ce-0042a35db572"   # "Munich Districts Map"
+PARENT_PAGE_ID = "3b73e55d-d52c-8113-99bd-c0f1d0130a28"   # "Munich Districts Map"
 OLD_DB_ID = "9680bc6275e249198244df1fc2bc7a08"            # "Munich Districts Colors"
 NEW_DB_TITLE = "Munich Sub-Districts (110)"
 
