@@ -175,6 +175,10 @@ def main():
         ".note{display:none;margin:3px 0 2px 27px;font-size:12.5px;line-height:1.4;color:#6b7280}"
         ".row.active .note{display:block}"
         ".panel footer{padding:11px 14px;font-size:12px;color:#6b7280;border-top:1px solid #e2e2e7;margin-top:auto}"
+        ".sortbar{display:flex;align-items:center;gap:8px;padding:8px 12px;"
+        "border-bottom:1px solid #e2e2e7;font-size:12.5px;color:#6b7280;background:#fafafa}"
+        ".sortbar select{flex:1;font:600 13px sans-serif;color:#1f2328;padding:5px 8px;"
+        "border:1px solid #e2e2e7;border-radius:6px;background:#fff;cursor:pointer}"
         ".num{position:absolute;transform:translate(-50%,-50%);font:600 9.5px sans-serif;"
         "color:#111;text-shadow:0 1px 2px rgba(255,255,255,.9);pointer-events:none;z-index:500;"
         "white-space:nowrap;text-align:center}"
@@ -221,6 +225,21 @@ def main():
         "interactive:false}).addTo(map);});\n"
         "document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){\n"
         "var l=byRef[r.dataset.ref];selectRow(r.dataset.ref);if(l)map.fitBounds(l.getBounds());});});\n"
+        "var RATING={'#3cb44b':0,'#ffe119':1,'#e6194b':2,'#d3d9e0':3,'':4};\n"
+        "function sortRows(mode){var rows=Array.prototype.slice.call(document.querySelectorAll('.row'));"
+        "rows.sort(function(a,b){var an=parseInt(a.dataset.ref,10),bn=parseInt(b.dataset.ref,10);"
+        "if(mode==='name'){var na=a.querySelector('.rname').textContent.replace(/^\\d+\\.\\s*/,''),"
+        "nb=b.querySelector('.rname').textContent.replace(/^\\d+\\.\\s*/,'');"
+        "var c=na.localeCompare(nb,'en');return c||an-bn;}"
+        "if(mode==='rating'){var ra=RATING.hasOwnProperty(COLOR[a.dataset.ref])?RATING[COLOR[a.dataset.ref]]:4,"
+        "rb=RATING.hasOwnProperty(COLOR[b.dataset.ref])?RATING[COLOR[b.dataset.ref]]:4;"
+        "return (ra-rb)||(an-bn);}"
+        "return an-bn;});"
+        "var list=document.getElementById('districts');"
+        "rows.forEach(function(r){list.appendChild(r);});}\n"
+        "document.getElementById('sort').addEventListener('change',function(){"
+        "sortRows(this.value);});\n"
+        "sortRows('nr');\n"
         "var locDot=null,locAcc=null,toastTimer=null;\n"
         "var panel=document.getElementById('panel'),burger=document.getElementById('burger');\n"
         "var locbtn=document.getElementById('locbtn');\n"
@@ -266,7 +285,11 @@ def main():
         '<span style="color:#ffe119">\u25cf Compromise</span>'
         '<span style="color:#d3d9e0">\u25cf Explore</span>'
         '<span style="color:#3cb44b">\u25cf Like</span></div>'
-        + "".join(rows)
+        + '<div class="sortbar"><label for="sort">Sort by</label><select id="sort">'
+        '<option value="nr">District number</option>'
+        '<option value="name">Alphabetical</option>'
+        '<option value="rating">Rating</option></select></div>'
+        + '<div id="districts">' + "".join(rows) + "</div>"
         + "<footer>25 Stadtbezirke \u00b7 auto-synced from the table</footer>"
     )
 
