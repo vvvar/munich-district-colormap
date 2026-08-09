@@ -170,6 +170,19 @@ def main():
         ".num{position:absolute;transform:translate(-50%,-50%);font:600 9.5px sans-serif;"
         "color:#111;text-shadow:0 1px 2px rgba(255,255,255,.9);pointer-events:none;z-index:500;"
         "white-space:nowrap;text-align:center}"
+        ".locbtn{position:absolute;right:10px;bottom:10px;z-index:1000;width:34px;height:34px;"
+        "background:#fff;border:1px solid #e2e2e7;border-radius:8px;cursor:pointer;display:flex;"
+        "align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.12);"
+        "color:#1f2328;font-size:16px;line-height:1}"
+        ".locbtn:hover{background:#f3f4f6}"
+        ".locbtn:active{background:#e5e7eb}"
+        ".locbtn .spin{display:none;width:14px;height:14px;border:2px solid #c7cbd1;"
+        "border-top-color:#1f2328;border-radius:50%;animation:locspin .8s linear infinite}"
+        ".locbtn.loading .glyph{display:none}.locbtn.loading .spin{display:block}"
+        "@keyframes locspin{to{transform:rotate(360deg)}}"
+        ".toast{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:1000;"
+        "background:rgba(31,35,40,.92);color:#fff;font-size:11px;padding:5px 12px;border-radius:6px;"
+        "display:none}"
         ".leaflet-pane{z-index:auto}.leaflet-control-container{z-index:auto}"
     )
 
@@ -196,6 +209,27 @@ def main():
         "interactive:false}).addTo(map);});\n"
         "document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){\n"
         "var l=byRef[r.dataset.ref];selectRow(r.dataset.ref);if(l)map.fitBounds(l.getBounds());});});\n"
+        "var locDot=null,locAcc=null,toastTimer=null;\n"
+        "function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;"
+        "t.style.display='block';clearTimeout(toastTimer);"
+        "toastTimer=setTimeout(function(){t.style.display='none';},4000);}\n"
+        "function setLocating(on){document.getElementById('locbtn').classList.toggle('loading',on);}\n"
+        "document.getElementById('locbtn').addEventListener('click',function(){\n"
+        "if(!navigator.geolocation){showToast('Geolocation not supported by this browser');return;}\n"
+        "setLocating(true);\n"
+        "navigator.geolocation.getCurrentPosition(function(pos){\n"
+        "setLocating(false);\n"
+        "var ll=[pos.coords.latitude,pos.coords.longitude];\n"
+        "if(!locDot){locAcc=L.circle(ll,{radius:pos.coords.accuracy,color:'#2563eb',"
+        "weight:1,fillColor:'#3b82f6',fillOpacity:.15}).addTo(map);"
+        "locDot=L.circleMarker(ll,{radius:7,color:'#fff',weight:2,fillColor:'#2563eb',"
+        "fillOpacity:1}).addTo(map);}\n"
+        "else{locAcc.setLatLng(ll).setRadius(pos.coords.accuracy);locDot.setLatLng(ll);}\n"
+        "map.setView(ll,Math.max(map.getZoom(),14));\n"
+        "},function(err){\n"
+        "setLocating(false);\n"
+        "var msg=err.code===1?'Location permission denied':'Location unavailable';\n"
+        "showToast(msg);},{enableHighAccuracy:true,timeout:15000,maximumAge:30000});});\n"
         "map.fitBounds(layer.getBounds(),{padding:[40,40]});\n"
         % (geojson, labels, TILES, ATTRIB, GREY)
     )
@@ -226,6 +260,10 @@ def main():
         '<div class="legend"><span style="color:#e6194b">\u25cf No go</span>'
         '<span style="color:#ffe119">\u25cf Explore</span>'
         '<span style="color:#3cb44b">\u25cf Like</span></div>\n'
+        '<button class="locbtn" id="locbtn" title="Show my location" '
+        'aria-label="Show my location"><span class="glyph">\u25ce</span>'
+        '<span class="spin"></span></button>\n'
+        '<div class="toast" id="toast"></div>\n'
         "</div>\n<aside class=\"panel\">%s</aside>\n</div>\n"
         "<script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" "
         "integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"\"></script>\n"
