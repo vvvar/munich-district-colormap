@@ -152,11 +152,18 @@ def main():
         "border:1px solid #e2e2e7;border-radius:8px;padding:6px 10px;font-size:11px;"
         "box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;gap:12px}"
         ".legend span{display:flex;align-items:center;gap:5px}"
-        ".panel{width:300px;flex:none;background:#fff;border-left:1px solid #e2e2e7;overflow-y:auto;"
-        "display:flex;flex-direction:column}"
-        ".panel header{padding:12px 12px 8px;border-bottom:1px solid #e2e2e7}"
+        ".panel{width:300px;position:absolute;top:0;right:0;bottom:0;background:#fff;"
+        "border-left:1px solid #e2e2e7;overflow-y:auto;display:flex;flex-direction:column;"
+        "transform:translateX(100%);transition:transform .25s ease;z-index:1100;"
+        "box-shadow:-4px 0 12px rgba(0,0,0,.08)}"
+        ".panel.open{transform:translateX(0)}"
+        ".panel header{padding:12px 40px 8px 12px;border-bottom:1px solid #e2e2e7;position:relative}"
         ".panel h1{margin:0;font-size:15px}"
         ".panel header p{margin:4px 0 0;font-size:11px;color:#6b7280}"
+        ".panel .close{position:absolute;top:8px;right:8px;width:28px;height:28px;border:none;"
+        "background:none;cursor:pointer;font-size:15px;color:#6b7280;border-radius:6px;display:flex;"
+        "align-items:center;justify-content:center}"
+        ".panel .close:hover{background:#f3f4f6;color:#1f2328}"
         ".row{padding:4px 10px;cursor:pointer}"
         ".row:hover{background:#f3f4f6}"
         ".row.active{background:#eef2ff}"
@@ -174,8 +181,12 @@ def main():
         "background:#fff;border:1px solid #e2e2e7;border-radius:8px;cursor:pointer;display:flex;"
         "align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.12);"
         "color:#1f2328;font-size:16px;line-height:1}"
-        ".locbtn:hover{background:#f3f4f6}"
-        ".locbtn:active{background:#e5e7eb}"
+        ".burger{position:absolute;top:10px;right:10px;z-index:1000;width:34px;height:34px;"
+        "background:#fff;border:1px solid #e2e2e7;border-radius:8px;cursor:pointer;display:flex;"
+        "align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.12);"
+        "color:#1f2328;font-size:15px;line-height:1}"
+        ".burger:hover,.locbtn:hover{background:#f3f4f6}"
+        ".burger:active,.locbtn:active{background:#e5e7eb}"
         ".locbtn .spin{display:none;width:14px;height:14px;border:2px solid #c7cbd1;"
         "border-top-color:#1f2328;border-radius:50%;animation:locspin .8s linear infinite}"
         ".locbtn.loading .glyph{display:none}.locbtn.loading .spin{display:block}"
@@ -210,6 +221,13 @@ def main():
         "document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){\n"
         "var l=byRef[r.dataset.ref];selectRow(r.dataset.ref);if(l)map.fitBounds(l.getBounds());});});\n"
         "var locDot=null,locAcc=null,toastTimer=null;\n"
+        "var panel=document.getElementById('panel'),burger=document.getElementById('burger');\n"
+        "function setPanel(open){panel.classList.toggle('open',open);"
+        "panel.setAttribute('aria-hidden',open?'false':'true');"
+        "burger.setAttribute('aria-expanded',open?'true':'false');}\n"
+        "burger.addEventListener('click',function(){setPanel(!panel.classList.contains('open'));});\n"
+        "document.getElementById('panelclose').addEventListener('click',function(){setPanel(false);});\n"
+        "document.addEventListener('keydown',function(e){if(e.key==='Escape')setPanel(false);});\n"
         "function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;"
         "t.style.display='block';clearTimeout(toastTimer);"
         "toastTimer=setTimeout(function(){t.style.display='none';},4000);}\n"
@@ -237,7 +255,8 @@ def main():
     panel = (
         '<header><h1>M\u00fcnchen</h1>'
         '<p>Colors come from the \u201cMunich Districts Colors\u201d table '
-        'below. Click a row to zoom to that district.</p></header>'
+        'below. Click a row to zoom to that district.</p>'
+        '<button class="close" id="panelclose" aria-label="Close districts list">\u2715</button></header>'
         + '<div class="legend" style="position:static;border:none;box-shadow:none;padding:8px 12px;'
         'border-bottom:1px solid #e2e2e7">'
         '<span style="color:#e6194b">\u25cf No go</span>'
@@ -260,11 +279,13 @@ def main():
         '<div class="legend"><span style="color:#e6194b">\u25cf No go</span>'
         '<span style="color:#ffe119">\u25cf Explore</span>'
         '<span style="color:#3cb44b">\u25cf Like</span></div>\n'
+        '<button class="burger" id="burger" title="Districts list" '
+        'aria-label="Open districts list" aria-expanded="false">\u2630</button>\n'
         '<button class="locbtn" id="locbtn" title="Show my location" '
         'aria-label="Show my location"><span class="glyph">\u25ce</span>'
         '<span class="spin"></span></button>\n'
         '<div class="toast" id="toast"></div>\n'
-        "</div>\n<aside class=\"panel\">%s</aside>\n</div>\n"
+        "</div>\n<aside class=\"panel\" id=\"panel\" aria-hidden=\"true\">%s</aside>\n</div>\n"
         "<script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" "
         "integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"\"></script>\n"
         "<script>\nvar COLOR=%s;\n%s</script>\n</body>\n</html>\n"
