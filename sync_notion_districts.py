@@ -11,10 +11,7 @@ Two sources of truth, one join key (`bt_nummer`, e.g. "09.1"):
 
 Behaviour:
   * First run (database does not exist yet): creates the database under the
-    "Munich Districts Map" page and seeds all rows, carrying the existing
-    borough-level `Color` from the old "Munich Districts Colors" database
-    down to its sub-districts (e.g. borough 9 = Green -> all "09.x" start
-    Green).
+    "Munich Districts Map" page and seeds all rows with `Color` = Grey.
   * Later runs: idempotent upsert keyed by `Code`. Metadata columns
     (Name, Borough, Area km², Centroid, Map) are refreshed; `Color` and
     `Notes` are left alone, including for rows the user has already rated.
@@ -34,7 +31,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
 PARENT_PAGE_ID = "3b73e55d-d52c-8113-99bd-c0f1d0130a28"   # "Munich Districts Map"
-OLD_DB_ID = "9680bc6275e249198244df1fc2bc7a08"            # "Munich Districts Colors"
 NEW_DB_TITLE = "Munich Sub-Districts (110)"
 
 GEOJSON = os.path.join(HERE, "munich_bezirksteile_named.geojson")
@@ -82,14 +78,12 @@ def load_districts():
     for f in data["features"]:
         p = f["properties"]
         code = p["bt_nummer"]
-        prefix = code.split(".")[0]
         names = p.get("os_names") or []
         best = names[0] if names else None
         title = "%s (%s)" % (best, code) if best else "%s (unnamed)" % code
         lat, lng = p["centroid_lat"], p["centroid_lng"]
         rows.append({
             "code": code,
-            "prefix": prefix,
             "title": title,
             "borough": p.get("stadtbezirk_name") or "",
             "area_km2": round(p.get("flaeche_qm", 0) / 1e6, 2),
@@ -99,27 +93,6 @@ def load_districts():
         })
     rows.sort(key=lambda r: tuple(int(x) for x in r["code"].split(".")))
     return rows
-
-
-def old_colors():
-    """Borough number (as string) -> Color select name from the old DB."""
-    out = {}
-    cursor = None
-    while True:
-        body = {"page_size": 100}
-        if cursor:
-            body["start_cursor"] = cursor
-        res = api("POST", "/databases/%s/query" % OLD_DB_ID, body)
-        for page in res.get("results", []):
-            props = page["properties"]
-            nr = props.get("Nr", {}).get("number")
-            color = props.get("Color", {}).get("select")
-            if nr is not None and color:
-                out[str(int(nr))] = color["name"]
-        cursor = res.get("next_cursor")
-        if not cursor:
-            break
-    return out
 
 
 def find_db():
@@ -185,15 +158,12 @@ def sync():
 
     db_id = find_db()
     if db_id is None:
-        colors = old_colors()
-        print("Migrating %d borough colors from old DB" % len(colors))
         db_id = create_db()
         print("Created database %s -> %s" % (NEW_DB_TITLE, db_id))
         for row in rows:
-            color = colors.get(row["prefix"], "Grey")
             api("POST", "/pages", {
                 "parent": {"database_id": db_id},
-                "properties": page_props(row, color=color),
+                "properties": page_props(row, color="Grey"),
             })
         print("Seeded %d rows" % len(rows))
     else:
