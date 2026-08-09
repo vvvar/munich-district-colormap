@@ -25,19 +25,27 @@ jobs:
           python-version: '3.12'
 
       - name: Bake map from Notion
-        run: python bake.py
+        run: python bake.py /tmp/index.html
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DB_ID: ${{ vars.NOTION_DB_ID }}
 
-      - name: Commit if changed
+      - name: Publish to gh-pages
         run: |
           git config user.name "map-sync bot"
           git config user.email "actions@users.noreply.github.com"
+          git fetch origin gh-pages --depth 1 || true
+          if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+          cp /tmp/index.html index.html
           git add index.html
           if git diff --cached --quiet; then
             echo "No changes"
           else
             git commit -m "sync map from Notion"
-            git push
+            git push origin gh-pages
           fi
