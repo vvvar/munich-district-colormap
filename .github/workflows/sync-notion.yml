@@ -29,6 +29,6 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
 
       - name: Rebuild and deploy map
-        run: gh workflow run sync-map.yml
+        run: gh workflow run sync-map
         env:
           GH_TOKEN: ${{ github.token }}
