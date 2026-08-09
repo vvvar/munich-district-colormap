@@ -28,7 +28,7 @@ A clickable map of Munich's **110 Stadtbezirksteile** (official sub-districts), 
 
 Both are joined by the official code `bt_nummer` (e.g. `"09.1"`). The sync scripts write metadata repo→Notion and **never overwrite `Color`/`Notes`**, so your ratings are safe.
 
-> **Migration note.** Ratings were previously kept in the 25-row "Munich Districts Colors" table. It is now archived (not deleted); its borough colors were carried down to the sub-districts as starting values (borough `9` = Green → all `09.x` start Green).
+> **Migration note.** Ratings were previously kept in the 25-row "Munich Districts Colors" table. It is now superseded (still present, not deleted); its borough colors were carried down to the sub-districts as starting values (borough `9` = Green → all `09.x` start Green). It is no longer used by the map.
 
 ## How it works
 
