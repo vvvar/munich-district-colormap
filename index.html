@@ -36,7 +36,7 @@ var layer=L.geoJSON(GEO,{
 }).addTo(map);
 var byRef={};var activeRef=null;
 function selectRow(ref){activeRef=(activeRef===ref)?null:ref;document.querySelectorAll('.row').forEach(function(r){r.classList.toggle('active',r.dataset.ref===activeRef);});}
-layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'transparent';l.options.fillOpacity=.35;l.setStyle(l.options);l.bindTooltip('<b>'+p.ref+'· '+p.name+'</b>',{sticky:true});l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.55});});l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.35});});l.on('click',function(){if(!drawMode)selectRow(p.ref);});});
+layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'transparent';l.options.fillOpacity=.35;l.setStyle(l.options);l.bindTooltip('<b>'+p.ref+'· '+p.name+'</b>',{sticky:true});l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.55});});l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.35});});l.on('click',function(){if(!drawMode){selectRow(p.ref);if(!panel.classList.contains('open'))setPanel(true);map.fitBounds(l.getBounds());}});});
 LABELS.forEach(function(b){L.marker([b.y,b.x],{icon:L.divIcon({className:'num',html:b.name,iconSize:[0,0]}),interactive:false}).addTo(map);});
 document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){
 var l=byRef[r.dataset.ref];selectRow(r.dataset.ref);if(l)map.fitBounds(l.getBounds());});});
