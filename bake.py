@@ -41,10 +41,12 @@ def fetch_colors():
             nr = props["Nr"]["number"]
             sel = props["Color"]["select"]
             url = props["Map"]["url"]
+            note = "".join(t.get("plain_text", "") for t in props["Notes"]["rich_text"]).strip()
             if nr is not None:
                 colors[str(int(nr))] = {
                     "color": sel["name"] if sel else None,
                     "map": url or None,
+                    "note": note or None,
                 }
         if data.get("has_more"):
             cursor = data["next_cursor"]
@@ -122,8 +124,9 @@ def main():
         labels.append('{ref:"%s",name:"%s",x:%.6f,y:%.6f,c:"%s"}' % (
             ref, f["properties"]["name"], x, y, hexc))
         rows.append(
-            '<div class="row" data-ref="%s"><span class="dot" style="background:%s"></span>'
-            '<span class="rname">%d. %s</span>%s</div>'
+            '<div class="row" data-ref="%s"><div class="rh"><span class="dot" '
+            'style="background:%s"></span>'
+            '<span class="rname">%d. %s</span>%s</div>%s</div>'
             % (
                 ref,
                 hexc,
@@ -131,6 +134,7 @@ def main():
                 f["properties"]["name"],
                 ('<a href="%s" target="_blank" rel="noopener">Maps</a>' % info["map"])
                 if info.get("map") else "",
+                ('<div class="note">%s</div>' % info["note"]) if info.get("note") else "",
             )
         )
     labels = ",".join(labels)
@@ -148,16 +152,20 @@ def main():
         "border:1px solid #e2e2e7;border-radius:8px;padding:6px 10px;font-size:11px;"
         "box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;gap:12px}"
         ".legend span{display:flex;align-items:center;gap:5px}"
-        ".panel{width:250px;flex:none;background:#fff;border-left:1px solid #e2e2e7;overflow-y:auto;"
+        ".panel{width:300px;flex:none;background:#fff;border-left:1px solid #e2e2e7;overflow-y:auto;"
         "display:flex;flex-direction:column}"
         ".panel header{padding:12px 12px 8px;border-bottom:1px solid #e2e2e7}"
         ".panel h1{margin:0;font-size:15px}"
         ".panel header p{margin:4px 0 0;font-size:11px;color:#6b7280}"
-        ".row{display:flex;align-items:center;gap:8px;padding:4px 10px;cursor:pointer}"
+        ".row{padding:4px 10px;cursor:pointer}"
         ".row:hover{background:#f3f4f6}"
+        ".row.active{background:#eef2ff}"
+        ".rh{display:flex;align-items:center;gap:8px}"
         ".dot{width:14px;height:14px;flex:none;border-radius:50%;border:1px solid rgba(0,0,0,.12)}"
         ".rname{flex:1;font-size:11.5px;line-height:1.15;min-width:0;color:#1f2328;font-weight:600}"
         ".row a{flex:none;font-size:10px;color:#2563eb;text-decoration:none;font-weight:600}"
+        ".note{display:none;margin:3px 0 2px 22px;font-size:10px;line-height:1.35;color:#6b7280}"
+        ".row.active .note{display:block}"
         ".panel footer{padding:10px 12px;font-size:10.5px;color:#6b7280;border-top:1px solid #e2e2e7;margin-top:auto}"
         ".num{position:absolute;transform:translate(-50%,-50%);font:600 9.5px sans-serif;"
         "color:#111;text-shadow:0 1px 2px rgba(255,255,255,.9);pointer-events:none;z-index:500;"
@@ -173,17 +181,21 @@ def main():
         "var layer=L.geoJSON(GEO,{\n"
         "  style:function(f){return {color:'#374151',weight:1,fillColor:null,fillOpacity:.35}}\n"
         "}).addTo(map);\n"
-        "var byRef={};\n"
+        "var byRef={};var activeRef=null;\n"
+        "function selectRow(ref){activeRef=(activeRef===ref)?null:ref;"
+        "document.querySelectorAll('.row').forEach(function(r){"
+        "r.classList.toggle('active',r.dataset.ref===activeRef);});}\n"
         "layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;"
         "l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'%s';"
         "l.options.fillOpacity=.35;l.setStyle(l.options);"
         "l.bindTooltip('<b>'+p.ref+'. '+p.name+'</b>',{sticky:true});"
         "l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.55});});"
-        "l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.35});});});\n"
+        "l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.35});});"
+        "l.on('click',function(){selectRow(p.ref);});});\n"
         "LABELS.forEach(function(b){L.marker([b.y,b.x],{icon:L.divIcon({className:'num',html:b.name,iconSize:[0,0]}),"
         "interactive:false}).addTo(map);});\n"
         "document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){\n"
-        "var l=byRef[r.dataset.ref];if(l)map.fitBounds(l.getBounds());});});\n"
+        "var l=byRef[r.dataset.ref];selectRow(r.dataset.ref);if(l)map.fitBounds(l.getBounds());});});\n"
         "map.fitBounds(layer.getBounds(),{padding:[40,40]});\n"
         % (geojson, labels, TILES, ATTRIB, GREY)
     )
