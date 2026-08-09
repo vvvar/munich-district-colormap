@@ -10,7 +10,9 @@ TOKEN = os.environ.get("NOTION_TOKEN", "")
 
 HEX = {"Red": "#e6194b", "Yellow": "#ffe119", "Green": "#3cb44b"}
 GREY = "#d3d9e0"
-PAD = 60
+
+TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+ATTRIB = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
 
 def fetch_colors():
@@ -51,100 +53,147 @@ def fetch_colors():
     return colors
 
 
+def centroid(coords):
+    # area-weighted centroid over all rings; good enough for labels
+    def ring_centroid(ring):
+        a = 0.0
+        cx = cy = 0.0
+        n = len(ring)
+        for i in range(n):
+            x1, y1 = ring[i]
+            x2, y2 = ring[(i + 1) % n]
+            cross = x1 * y2 - x2 * y1
+            a += cross
+            cx += (x1 + x2) * cross
+            cy += (y1 + y2) * cross
+        if abs(a) < 1e-12:
+            return ring[0][0], ring[0][1]
+        a /= 2
+        return cx / (6 * a), cy / (6 * a)
+
+    if coords and isinstance(coords[0][0][0], list):
+        # MultiPolygon: coords = list of polygons, each a list of rings
+        rings = [r for poly in coords for r in poly]
+    else:
+        rings = coords
+    tot = 0.0
+    cx = cy = 0.0
+    for ring in rings:
+        x, y = ring_centroid(ring)
+        area = abs(0.5 * sum(ring[i][0] * ring[(i + 1) % len(ring)][1] -
+                             ring[(i + 1) % len(ring)][0] * ring[i][1]
+                             for i in range(len(ring))))
+        tot += area
+        cx += x * area
+        cy += y * area
+    if tot == 0:
+        return ring_centroid(rings[0])
+    return cx / tot, cy / tot
+
+
+def compact(geojson):
+    # round coords to 6 decimals to shrink the payload
+    for f in geojson["features"]:
+        g = f["geometry"]
+        rings = g["coordinates"] if g["type"] == "Polygon" else [
+            r for p in g["coordinates"] for r in p]
+        for ring in rings:
+            for pt in ring:
+                pt[0] = round(pt[0], 6)
+                pt[1] = round(pt[1], 6)
+    return geojson
+
+
 def main():
-    data = json.load(open(os.path.join(HERE, "paths.json")))
-    feats = data["features"]
+    data = json.load(open(os.path.join(HERE, "stadtbezirke.geojson")))
+    compact(data)
     colors = fetch_colors()
-    vb = (
-        data["xmin"] - PAD,
-        data["ymin"] - PAD,
-        data["xmax"] - data["xmin"] + 2 * PAD,
-        data["ymax"] - data["ymin"] + 2 * PAD,
-    )
+    geojson = json.dumps(data, ensure_ascii=True, separators=(",", ":"))
 
-    groups = []
+    feats = data["features"]
+    labels = []
+    rows = []
     for i, f in enumerate(feats):
-        ref = f["ref"]
+        ref = f["properties"]["ref"]
         info = colors.get(ref, {})
-        fill = HEX.get(info.get("color"), GREY)
-        g = '<g class="g{i}"><path class="p{i}" d="{d}"><title>{name}</title></path>' \
-            '<text class="lbl lbl{i}" x="{cx:.1f}" y="{cy:.1f}">{ref}</text>' \
-            '<text class="nm nm{i}" x="{cx:.1f}" y="{cy:.1f}">{name}</text></g>'
-        if info.get("map"):
-            g = '<g class="g{i}"><a href="{href}" target="_blank" rel="noopener">' \
-                '<path class="p{i}" d="{d}"><title>{name}</title></path></a>' \
-                '<text class="lbl lbl{i}" x="{cx:.1f}" y="{cy:.1f}">{ref}</text>' \
-                '<text class="nm nm{i}" x="{cx:.1f}" y="{cy:.1f}">{name}</text></g>'.format(
-                href=info["map"], i=i, d=f["d"], name=f["name"],
-                cx=f["cx"], cy=f["cy"], ref=ref)
-        else:
-            g = g.format(i=i, d=f["d"], name=f["name"],
-                         cx=f["cx"], cy=f["cy"], ref=ref)
-        groups.append(g)
-    svg = (
-        '<svg viewBox="%.1f %.1f %.1f %.1f" role="img" '
-        'aria-label="Munich district map">\n' % vb
-        + "\n".join(groups)
-        + "\n</svg>"
-    )
+        color = info.get("color")
+        hexc = HEX.get(color, GREY)
+        x, y = centroid(f["geometry"]["coordinates"])
+        labels.append('{ref:"%s",name:"%s",x:%.6f,y:%.6f,c:"%s"}' % (
+            ref, f["properties"]["name"], x, y, hexc))
+        rows.append(
+            '<div class="row" data-ref="%s"><span class="dot" style="background:%s"></span>'
+            '<span class="rname">%d. %s</span>%s</div>'
+            % (
+                ref,
+                hexc,
+                int(ref),
+                f["properties"]["name"],
+                ('<a href="%s" target="_blank" rel="noopener">Maps</a>' % info["map"])
+                if info.get("map") else "",
+            )
+        )
+    labels = ",".join(labels)
 
-    rules = []
-    for i, f in enumerate(feats):
-        info = colors.get(f["ref"], {})
-        rules.append(".p%d{fill:%s}" % (i, HEX.get(info.get("color"), GREY)))
     css = (
-        "html,body{margin:0;height:100%;overflow:hidden;background:#eef1f4;"
-        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2328}"
+        "html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,"
+        "BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2328}"
         ".l{position:fixed;inset:0;display:flex}"
-        ".map{flex:1;position:relative;min-width:0;background:#cfe3ea}"
-        ".map svg{position:absolute;inset:0;width:100%;height:100%}"
-        "path{stroke:#374151;stroke-width:1;fill-opacity:.85;transition:fill-opacity .12s}"
-        ".g:hover path{stroke:#111827;stroke-width:1.8;fill-opacity:1}"
-        ".lbl{font:600 10px sans-serif;fill:#111;pointer-events:none;text-anchor:middle}"
-        ".nm{font:700 9.5px sans-serif;fill:#111;opacity:0;pointer-events:none;text-anchor:middle;"
-        "paint-order:stroke;stroke:#fff;stroke-width:2.5;transform:translateY(0)}"
-        ".g:hover .nm{opacity:1;transform:translateY(-10px)}"
-        ".maptitle{position:absolute;top:10px;left:10px;z-index:2;background:rgba(255,255,255,.92);"
+        ".map{flex:1;position:relative;min-width:0}"
+        "#map{position:absolute;inset:0}"
+        ".maptitle{position:absolute;top:10px;left:10px;z-index:1000;background:rgba(255,255,255,.92);"
         "border:1px solid #e2e2e7;border-radius:8px;padding:6px 10px;font-size:12px;"
         "box-shadow:0 2px 8px rgba(0,0,0,.08)}"
+        ".legend{position:absolute;top:48px;left:10px;z-index:1000;background:rgba(255,255,255,.92);"
+        "border:1px solid #e2e2e7;border-radius:8px;padding:6px 10px;font-size:11px;"
+        "box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;gap:12px}"
+        ".legend span{display:flex;align-items:center;gap:5px}"
         ".panel{width:250px;flex:none;background:#fff;border-left:1px solid #e2e2e7;overflow-y:auto;"
         "display:flex;flex-direction:column}"
         ".panel header{padding:12px 12px 8px;border-bottom:1px solid #e2e2e7}"
         ".panel h1{margin:0;font-size:15px}"
         ".panel header p{margin:4px 0 0;font-size:11px;color:#6b7280}"
-        ".row{display:flex;align-items:center;gap:8px;padding:4px 10px}"
+        ".row{display:flex;align-items:center;gap:8px;padding:4px 10px;cursor:pointer}"
         ".row:hover{background:#f3f4f6}"
         ".dot{width:14px;height:14px;flex:none;border-radius:50%;border:1px solid rgba(0,0,0,.12)}"
-        ".rname{flex:1;font-size:11.5px;line-height:1.15;min-width:0;color:#1f2328;opacity:1;font-weight:600}"
+        ".rname{flex:1;font-size:11.5px;line-height:1.15;min-width:0;color:#1f2328;font-weight:600}"
         ".row a{flex:none;font-size:10px;color:#2563eb;text-decoration:none;font-weight:600}"
-        ".legend{display:flex;gap:12px;padding:8px 12px;border-bottom:1px solid #e2e2e7;font-size:10.5px}"
-        ".legend span{display:flex;align-items:center;gap:5px}"
         ".panel footer{padding:10px 12px;font-size:10.5px;color:#6b7280;border-top:1px solid #e2e2e7;margin-top:auto}"
-        + "".join(rules)
+        ".num{position:absolute;transform:translate(-50%,-50%);font:600 11px sans-serif;"
+        "color:#111;text-shadow:0 1px 2px rgba(255,255,255,.9);pointer-events:none;z-index:500}"
+        ".leaflet-pane{z-index:auto}.leaflet-control-container{z-index:auto}"
     )
 
-    rows = []
-    for i, f in enumerate(feats):
-        info = colors.get(f["ref"], {})
-        color = info.get("color")
-        hexc = HEX.get(color, GREY)
-        rows.append(
-            '<div class="row"><span class="dot" style="background:%s"></span>'
-            '<span class="rname">%d. %s</span>%s</div>'
-            % (
-                hexc,
-                int(f["ref"]),
-                f["name"],
-                ('<a href="%s" target="_blank" rel="noopener">Maps</a>' % info["map"])
-                if info.get("map") else "",
-            )
-        )
+    js = (
+        "var GEO=%s;\n"
+        "var LABELS=[%s];\n"
+        "var map=L.map('map').setView([48.1374,11.5755],12);\n"
+        "L.tileLayer('%s',{maxZoom:19,attribution:'%s'}).addTo(map);\n"
+        "var layer=L.geoJSON(GEO,{\n"
+        "  style:function(f){return {color:'#374151',weight:1,fillColor:null,fillOpacity:.55}};\n"
+        "}).addTo(map);\n"
+        "var byRef={};\n"
+        "layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;"
+        "l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'%s';"
+        "l.options.fillOpacity=.55;l.setStyle(l.options);"
+        "l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.8});"
+        "l.bindTooltip(p.name,{sticky:true}).openTooltip();});"
+        "l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.55});l.unbindTooltip();});});\n"
+        "LABELS.forEach(function(b){L.marker([b.y,b.x],{icon:L.divIcon({className:'num',html:b.ref,iconSize:[0,0]}),"
+        "interactive:false}).addTo(map);});\n"
+        "document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){\n"
+        "var l=byRef[r.dataset.ref];if(l)map.fitBounds(l.getBounds());});});\n"
+        "map.fitBounds(layer.getBounds(),{padding:[40,40]});\n"
+        % (geojson, labels, TILES, ATTRIB, GREY)
+    )
+
     panel = (
         '<header><h1>M\u00fcnchen</h1>'
         '<p>Colors come from the \u201cMunich Districts Colors\u201d table '
-        'below. Open a district in Google Maps via the Map link in that table '
-        'or the Maps button here.</p></header>'
-        + '<div class="legend"><span style="color:#e6194b">\u25cf No go</span>'
+        'below. Click a row to zoom to that district.</p></header>'
+        + '<div class="legend" style="position:static;border:none;box-shadow:none;padding:8px 12px;'
+        'border-bottom:1px solid #e2e2e7">'
+        '<span style="color:#e6194b">\u25cf No go</span>'
         '<span style="color:#ffe119">\u25cf Explore</span>'
         '<span style="color:#3cb44b">\u25cf Like</span></div>'
         + "".join(rows)
@@ -154,11 +203,22 @@ def main():
     html = (
         "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-        "<title>Munich Desired Districts Map</title>\n<style>\n%s\n</style>\n"
+        "<title>Munich Desired Districts Map</title>\n"
+        "<link rel=\"stylesheet\" href=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.css\" "
+        "integrity=\"sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=\" crossorigin=\"\">\n"
+        "<style>\n%s\n</style>\n"
         "</head>\n<body>\n<div class=\"l\">\n<div class=\"map\">\n"
-        '<div class="maptitle">M\u00fcnchen &middot; 25 Stadtbezirke</div>\n%s\n</div>\n'
-        '<aside class="panel">%s</aside>\n</div>\n</body>\n</html>\n'
-        % (css, svg, panel)
+        '<div id="map"></div>\n'
+        '<div class="maptitle">M\u00fcnchen &middot; 25 Stadtbezirke</div>\n'
+        '<div class="legend"><span style="color:#e6194b">\u25cf No go</span>'
+        '<span style="color:#ffe119">\u25cf Explore</span>'
+        '<span style="color:#3cb44b">\u25cf Like</span></div>\n'
+        "</div>\n<aside class=\"panel\">%s</aside>\n</div>\n"
+        "<script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" "
+        "integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"\"></script>\n"
+        "<script>\nvar COLOR=%s;\n%s</script>\n</body>\n</html>\n"
+        % (css, panel, json.dumps({f["properties"]["ref"]: HEX.get(colors.get(f["properties"]["ref"], {}).get("color"), GREY)
+                                    for f in feats}, separators=(",", ":")), js)
     )
 
     out = sys.argv[1] if len(sys.argv) > 1 else "index.html"
