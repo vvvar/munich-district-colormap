@@ -159,8 +159,9 @@ def main():
         ".rname{flex:1;font-size:11.5px;line-height:1.15;min-width:0;color:#1f2328;font-weight:600}"
         ".row a{flex:none;font-size:10px;color:#2563eb;text-decoration:none;font-weight:600}"
         ".panel footer{padding:10px 12px;font-size:10.5px;color:#6b7280;border-top:1px solid #e2e2e7;margin-top:auto}"
-        ".num{position:absolute;transform:translate(-50%,-50%);font:600 11px sans-serif;"
-        "color:#111;text-shadow:0 1px 2px rgba(255,255,255,.9);pointer-events:none;z-index:500}"
+        ".num{position:absolute;transform:translate(-50%,-50%);font:600 9.5px sans-serif;"
+        "color:#111;text-shadow:0 1px 2px rgba(255,255,255,.9);pointer-events:none;z-index:500;"
+        "white-space:nowrap;text-align:center}"
         ".leaflet-pane{z-index:auto}.leaflet-control-container{z-index:auto}"
     )
 
@@ -179,7 +180,7 @@ def main():
         "l.bindTooltip('<b>'+p.ref+'. '+p.name+'</b>',{sticky:true});"
         "l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.8});});"
         "l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.55});});});\n"
-        "LABELS.forEach(function(b){L.marker([b.y,b.x],{icon:L.divIcon({className:'num',html:b.ref,iconSize:[0,0]}),"
+        "LABELS.forEach(function(b){L.marker([b.y,b.x],{icon:L.divIcon({className:'num',html:b.name,iconSize:[0,0]}),"
         "interactive:false}).addTo(map);});\n"
         "document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){\n"
         "var l=byRef[r.dataset.ref];if(l)map.fitBounds(l.getBounds());});});\n"
