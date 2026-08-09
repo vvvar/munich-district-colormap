@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import math
 import os
 import sys
 import urllib.request
@@ -39,12 +40,10 @@ def fetch_colors():
             props = row["properties"]
             nr = props["Nr"]["number"]
             sel = props["Color"]["select"]
-            url = props["Map"]["url"]
             note = "".join(t.get("plain_text", "") for t in props["Notes"]["rich_text"]).strip()
             if nr is not None:
                 colors[str(int(nr))] = {
                     "color": sel["name"] if sel else None,
-                    "map": url or None,
                     "note": note or None,
                 }
         if data.get("has_more"):
@@ -92,6 +91,35 @@ def centroid(coords):
     return cx / tot, cy / tot
 
 
+def bounds(coords):
+    xs = []
+    ys = []
+
+    def walk(c):
+        if isinstance(c[0], (int, float)):
+            xs.append(c[0])
+            ys.append(c[1])
+        else:
+            for sub in c:
+                walk(sub)
+
+    walk(coords)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def gmaps_url(coords):
+    # Opens Google Maps with a selection box (square) covering the district,
+    # instead of a single pin.
+    x0, y0, x1, y1 = bounds(coords)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    span_x = (x1 - x0) * 1.15  # pad so the box frames the district
+    span_y = (y1 - y0) * 1.15
+    deg = max(span_y, span_x * math.cos(math.radians(cy)))
+    z = max(12, min(15, round(math.log2(360 / deg)) - 1))
+    return "https://www.google.com/maps?q=loc:%f,%f&sll=%f,%f&sspn=%f,%f&z=%d" % (
+        cy, cx, cy, cx, span_y, span_x, z)
+
+
 def compact(geojson):
     # round coords to 6 decimals to shrink the payload
     for f in geojson["features"]:
@@ -122,6 +150,7 @@ def main():
         dot = hexc or "transparent"
         label_c = hexc or "#9aa1a9"
         x, y = centroid(f["geometry"]["coordinates"])
+        maps_url = gmaps_url(f["geometry"]["coordinates"])
         labels.append('{ref:"%s",name:"%s",x:%.6f,y:%.6f,c:"%s"}' % (
             ref, f["properties"]["name"], x, y, label_c))
         rows.append(
@@ -133,8 +162,7 @@ def main():
                 dot,
                 int(ref),
                 f["properties"]["name"],
-                ('<a href="%s" target="_blank" rel="noopener">Maps</a>' % info["map"])
-                if info.get("map") else "",
+                '<a href="%s" target="_blank" rel="noopener">Maps</a>' % maps_url,
                 ('<div class="note">%s</div>' % info["note"]) if info.get("note") else "",
             )
         )
