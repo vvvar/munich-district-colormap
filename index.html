@@ -29,7 +29,7 @@ var layer=L.geoJSON(GEO,{
   style:function(f){return {color:'#374151',weight:1,fillColor:null,fillOpacity:.55}}
 }).addTo(map);
 var byRef={};
-layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'#d3d9e0';l.options.fillOpacity=.55;l.setStyle(l.options);l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.8});l.bindTooltip(p.name,{sticky:true}).openTooltip();});l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.55});l.unbindTooltip();});});
+layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'#d3d9e0';l.options.fillOpacity=.55;l.setStyle(l.options);l.bindTooltip('<b>'+p.ref+'. '+p.name+'</b>',{sticky:true});l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.8});});l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.55});});});
 LABELS.forEach(function(b){L.marker([b.y,b.x],{icon:L.divIcon({className:'num',html:b.ref,iconSize:[0,0]}),interactive:false}).addTo(map);});
 document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){
 var l=byRef[r.dataset.ref];if(l)map.fitBounds(l.getBounds());});});
