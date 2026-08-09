@@ -8,8 +8,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DB_ID = os.environ.get("NOTION_DB_ID") or "9680bc6275e249198244df1fc2bc7a08"
 TOKEN = os.environ.get("NOTION_TOKEN", "")
 
-HEX = {"Red": "#e6194b", "Yellow": "#ffe119", "Green": "#3cb44b"}
-GREY = "#d3d9e0"
+HEX = {"Red": "#e6194b", "Yellow": "#ffe119", "Green": "#3cb44b", "Grey": "#d3d9e0"}
 
 TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 ATTRIB = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -119,17 +118,19 @@ def main():
         ref = f["properties"]["ref"]
         info = colors.get(ref, {})
         color = info.get("color")
-        hexc = HEX.get(color, GREY)
+        hexc = HEX.get(color)
+        dot = hexc or "transparent"
+        label_c = hexc or "#9aa1a9"
         x, y = centroid(f["geometry"]["coordinates"])
         labels.append('{ref:"%s",name:"%s",x:%.6f,y:%.6f,c:"%s"}' % (
-            ref, f["properties"]["name"], x, y, hexc))
+            ref, f["properties"]["name"], x, y, label_c))
         rows.append(
             '<div class="row" data-ref="%s"><div class="rh"><span class="dot" '
             'style="background:%s"></span>'
             '<span class="rname">%d. %s</span>%s</div>%s</div>'
             % (
                 ref,
-                hexc,
+                dot,
                 int(ref),
                 f["properties"]["name"],
                 ('<a href="%s" target="_blank" rel="noopener">Maps</a>' % info["map"])
@@ -150,7 +151,7 @@ def main():
         "box-shadow:0 2px 8px rgba(0,0,0,.08)}"
         ".legend{position:absolute;top:48px;left:10px;z-index:1000;background:rgba(255,255,255,.92);"
          "border:1px solid #e2e2e7;border-radius:8px;padding:6px 10px;font-size:12.5px;"
-        "box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;gap:12px}"
+        'box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;flex-wrap:wrap;gap:8px 12px}'
         ".legend span{display:flex;align-items:center;gap:5px}"
         ".panel{width:360px;position:absolute;top:0;right:0;bottom:0;background:#fff;"
         "border-left:1px solid #e2e2e7;overflow-y:auto;display:flex;flex-direction:column;"
@@ -210,7 +211,7 @@ def main():
         "document.querySelectorAll('.row').forEach(function(r){"
         "r.classList.toggle('active',r.dataset.ref===activeRef);});}\n"
         "layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;"
-        "l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'%s';"
+        "l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'transparent';"
         "l.options.fillOpacity=.35;l.setStyle(l.options);"
         "l.bindTooltip('<b>'+p.ref+'. '+p.name+'</b>',{sticky:true});"
         "l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.55});});"
@@ -251,7 +252,7 @@ def main():
         "var msg=err.code===1?'Location permission denied':'Location unavailable';\n"
         "showToast(msg);},{enableHighAccuracy:true,timeout:15000,maximumAge:30000});});\n"
         "map.fitBounds(layer.getBounds(),{padding:[40,40]});\n"
-        % (geojson, labels, TILES, ATTRIB, GREY)
+        % (geojson, labels, TILES, ATTRIB)
     )
 
     panel = (
@@ -262,7 +263,8 @@ def main():
         + '<div class="legend" style="position:static;border:none;box-shadow:none;padding:8px 12px;'
         'border-bottom:1px solid #e2e2e7">'
         '<span style="color:#e6194b">\u25cf No go</span>'
-        '<span style="color:#ffe119">\u25cf Explore</span>'
+        '<span style="color:#ffe119">\u25cf Compromise</span>'
+        '<span style="color:#d3d9e0">\u25cf Explore</span>'
         '<span style="color:#3cb44b">\u25cf Like</span></div>'
         + "".join(rows)
         + "<footer>25 Stadtbezirke \u00b7 auto-synced from the table</footer>"
@@ -279,7 +281,8 @@ def main():
         '<div id="map"></div>\n'
         '<div class="maptitle">M\u00fcnchen &middot; 25 Stadtbezirke</div>\n'
         '<div class="legend"><span style="color:#e6194b">\u25cf No go</span>'
-        '<span style="color:#ffe119">\u25cf Explore</span>'
+        '<span style="color:#ffe119">\u25cf Compromise</span>'
+        '<span style="color:#d3d9e0">\u25cf Explore</span>'
         '<span style="color:#3cb44b">\u25cf Like</span></div>\n'
         '<button class="burger" id="burger" title="Districts list" '
         'aria-label="Open districts list" aria-expanded="false">\u2630</button>\n'
@@ -291,7 +294,7 @@ def main():
         "<script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" "
         "integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"\"></script>\n"
         "<script>\nvar COLOR=%s;\n%s</script>\n</body>\n</html>\n"
-        % (css, panel, json.dumps({f["properties"]["ref"]: HEX.get(colors.get(f["properties"]["ref"], {}).get("color"), GREY)
+        % (css, panel, json.dumps({f["properties"]["ref"]: HEX.get(colors.get(f["properties"]["ref"], {}).get("color")) or ""
                                     for f in feats}, separators=(",", ":")), js)
     )
 
