@@ -170,7 +170,7 @@ def main():
         "var map=L.map('map').setView([48.1374,11.5755],12);\n"
         "L.tileLayer('%s',{maxZoom:19,attribution:'%s'}).addTo(map);\n"
         "var layer=L.geoJSON(GEO,{\n"
-        "  style:function(f){return {color:'#374151',weight:1,fillColor:null,fillOpacity:.55}};\n"
+        "  style:function(f){return {color:'#374151',weight:1,fillColor:null,fillOpacity:.55}}\n"
         "}).addTo(map);\n"
         "var byRef={};\n"
         "layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;"
