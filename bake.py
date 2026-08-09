@@ -10,7 +10,8 @@ DB_TITLE = "Munich Sub-Districts (110)"
 DB_ID = os.environ.get("NOTION_DB_ID")
 TOKEN = os.environ.get("NOTION_TOKEN", "")
 
-HEX = {"Red": "#e6194b", "Yellow": "#ffe119", "Green": "#3cb44b", "Grey": "#d3d9e0"}
+RATING_HEX = {0: "#d3d9e0", 1: "#e6194b", 2: "#f58231", 3: "#ffe119", 4: "#a4d65e", 5: "#3cb44b"}
+COLOR_TO_RATING = {"Grey": 0, "Red": 1, "Yellow": 3, "Green": 5}
 
 TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 ATTRIB = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -41,14 +42,14 @@ def find_db():
     return None
 
 
-def fetch_colors():
+def fetch_ratings():
     if not TOKEN:
         return {}
     db_id = DB_ID or find_db()
     if not db_id:
-        print("Notion DB %r not found; using no colors" % DB_TITLE)
+        print("Notion DB %r not found; using no ratings" % DB_TITLE)
         return {}
-    colors = {}
+    ratings = {}
     cursor = None
     while True:
         body = {"page_size": 100}
@@ -59,18 +60,26 @@ def fetch_colors():
             props = row["properties"]
             code = props["Code"]["rich_text"]
             key = code[0]["plain_text"] if code else None
-            sel = props["Color"]["select"]
             note = "".join(t.get("plain_text", "") for t in props["Notes"]["rich_text"]).strip()
+            rating = 0
+            if "Rating" in props:
+                num = props["Rating"].get("number")
+                if isinstance(num, (int, float)) and 0 <= num <= 5:
+                    rating = int(num)
+            else:
+                # legacy `Color` select fallback during a transition window
+                sel = props.get("Color", {}).get("select") or {}
+                rating = COLOR_TO_RATING.get(sel.get("name"), 0)
             if key:
-                colors[key] = {
-                    "color": sel["name"] if sel else None,
+                ratings[key] = {
+                    "rating": rating,
                     "note": note or None,
                 }
         if data.get("has_more"):
             cursor = data["next_cursor"]
         else:
             break
-    return colors
+    return ratings
 
 
 def centroid(coords):
@@ -163,16 +172,16 @@ def main():
         p["name"] = names[0] if names else "%s (unnamed)" % p["bt_nummer"]
         p["label"] = p["name"] if not names else "%s %s" % (p["ref"], p["name"])
     compact(data)
-    colors = fetch_colors()
+    ratings = fetch_ratings()
     geojson = json.dumps(data, ensure_ascii=True, separators=(",", ":"))
 
     labels = []
     rows = []
     for i, f in enumerate(feats):
         ref = f["properties"]["ref"]
-        info = colors.get(ref, {})
-        color = info.get("color")
-        hexc = HEX.get(color)
+        info = ratings.get(ref, {})
+        rating = info.get("rating", 0)
+        hexc = RATING_HEX.get(rating)
         dot = hexc or "transparent"
         label_c = hexc or "#9aa1a9"
         x, y = centroid(f["geometry"]["coordinates"])
@@ -282,6 +291,7 @@ def main():
     js = (
         "var GEO=%s;\n"
         "var LABELS=[%s];\n"
+        "var RATING=%s;\n"
         "var map=L.map('map').setView([48.1374,11.5755],12);\n"
         "L.tileLayer('%s',{maxZoom:19,attribution:'%s'}).addTo(map);\n"
         "var layer=L.geoJSON(GEO,{\n"
@@ -302,14 +312,13 @@ def main():
         "interactive:false}).addTo(map);});\n"
         "document.querySelectorAll('.row').forEach(function(r){r.addEventListener('click',function(){\n"
         "var l=byRef[r.dataset.ref];selectRow(r.dataset.ref);if(l)map.fitBounds(l.getBounds());});});\n"
-        "var RATING={'#3cb44b':0,'#ffe119':1,'#e6194b':2,'#d3d9e0':3,'':4};\n"
         "function sortRows(mode){var rows=Array.prototype.slice.call(document.querySelectorAll('.row'));"
         "rows.sort(function(a,b){var ar=a.dataset.ref,br=b.dataset.ref,ord=ar<br?-1:ar>br?1:0;"
         "if(mode==='name'){var na=a.querySelector('.rname').textContent.replace(/^[\\d.]+\\s*/,''),"
         "nb=b.querySelector('.rname').textContent.replace(/^[\\d.]+\\s*/,'');"
         "var c=na.localeCompare(nb,'en');return c||ord;}"
-        "if(mode==='rating'){var ra=RATING.hasOwnProperty(COLOR[a.dataset.ref])?RATING[COLOR[a.dataset.ref]]:4,"
-        "rb=RATING.hasOwnProperty(COLOR[b.dataset.ref])?RATING[COLOR[b.dataset.ref]]:4;"
+        "if(mode==='rating'){var ra=isFinite(RATING[a.dataset.ref])?RATING[a.dataset.ref]:0,"
+        "rb=isFinite(RATING[b.dataset.ref])?RATING[b.dataset.ref]:0;"
         "return (ra-rb)||ord;}"
         "return ord;});"
         "var list=document.getElementById('districts');"
@@ -414,20 +423,25 @@ def main():
         "function deleteSpot(id){spots=spots.filter(function(x){return x.id!==id;});"
         "saveSpots();renderMarks();showToast('Area deleted');}\n"
         "loadSpots();renderMarks();\n"
-        % (geojson, labels, TILES, ATTRIB)
+        % (geojson, labels,
+           json.dumps({f["properties"]["ref"]: ratings.get(f["properties"]["ref"], {}).get("rating", 0)
+                       for f in feats}, separators=(",", ":")),
+           TILES, ATTRIB)
     )
 
     panel = (
         '<header><h1>M\u00fcnchen</h1>'
-        '<p>Colors come from the \u201cMunich Sub-Districts (110)\u201d table '
+        '<p>Ratings come from the \u201cMunich Sub-Districts (110)\u201d table '
         'below. Click a row to zoom to that sub-district.</p>'
         '<button class="close" id="panelclose" aria-label="Close districts list">\u2715</button></header>'
         + '<div class="legend" style="position:static;border:none;box-shadow:none;padding:8px 12px;'
         'border-bottom:1px solid #e2e2e7">'
-        '<span style="color:#e6194b">\u25cf No go</span>'
-        '<span style="color:#ffe119">\u25cf Compromise</span>'
-        '<span style="color:#d3d9e0">\u25cf Explore</span>'
-        '<span style="color:#3cb44b">\u25cf Like</span></div>'
+        '<span style="color:#d3d9e0">\u25cf 0 Explore</span>'
+        '<span style="color:#e6194b">\u25cf 1 No go</span>'
+        '<span style="color:#f58231">\u25cf 2 Meh</span>'
+        '<span style="color:#ffe119">\u25cf 3 Compromise</span>'
+        '<span style="color:#a4d65e">\u25cf 4 Nice</span>'
+        '<span style="color:#3cb44b">\u25cf 5 Like</span></div>'
         + '<div class="sortbar"><label for="sort">Sort by</label><select id="sort">'
         '<option value="nr">District number</option>'
         '<option value="name">Alphabetical</option>'
@@ -446,10 +460,12 @@ def main():
         "</head>\n<body>\n<div class=\"l\">\n<div class=\"map\">\n"
         '<div id="map"></div>\n'
         '<div class="maptitle">M\u00fcnchen &middot; 110 Stadtbezirksteile</div>\n'
-        '<div class="legend"><span style="color:#e6194b">\u25cf No go</span>'
-        '<span style="color:#ffe119">\u25cf Compromise</span>'
-        '<span style="color:#d3d9e0">\u25cf Explore</span>'
-        '<span style="color:#3cb44b">\u25cf Like</span></div>\n'
+        '<div class="legend"><span style="color:#d3d9e0">\u25cf 0 Explore</span>'
+        '<span style="color:#e6194b">\u25cf 1 No go</span>'
+        '<span style="color:#f58231">\u25cf 2 Meh</span>'
+        '<span style="color:#ffe119">\u25cf 3 Compromise</span>'
+        '<span style="color:#a4d65e">\u25cf 4 Nice</span>'
+        '<span style="color:#3cb44b">\u25cf 5 Like</span></div>\n'
         '<button class="burger" id="burger" title="Districts list" '
         'aria-label="Open districts list" aria-expanded="false">\u2630</button>\n'
         '<button class="locbtn" id="locbtn" title="Show my location" '
@@ -472,8 +488,11 @@ def main():
         "<script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" "
         "integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"\"></script>\n"
         "<script>\nvar COLOR=%s;\n%s</script>\n</body>\n</html>\n"
-        % (css, panel, json.dumps({f["properties"]["ref"]: HEX.get(colors.get(f["properties"]["ref"], {}).get("color")) or ""
-                                    for f in feats}, separators=(",", ":")), js)
+        % (css, panel,
+           json.dumps({f["properties"]["ref"]:
+                       RATING_HEX.get(ratings.get(f["properties"]["ref"], {}).get("rating", 0), "#d3d9e0")
+                       for f in feats}, separators=(",", ":")),
+           js)
     )
 
     out = sys.argv[1] if len(sys.argv) > 1 else "index.html"
