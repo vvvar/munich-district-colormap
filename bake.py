@@ -102,8 +102,8 @@ def main():
         ".g:hover path{stroke:#111827;stroke-width:1.8;fill-opacity:1}"
         ".lbl{font:600 10px sans-serif;fill:#111;pointer-events:none;text-anchor:middle}"
         ".nm{font:700 9.5px sans-serif;fill:#111;opacity:0;pointer-events:none;text-anchor:middle;"
-        "paint-order:stroke;stroke:#fff;stroke-width:2.5}"
-        ".g:hover .lbl{opacity:0}.g:hover .nm{opacity:1}"
+        "paint-order:stroke;stroke:#fff;stroke-width:2.5;transform:translateY(0)}"
+        ".g:hover .nm{opacity:1;transform:translateY(-10px)}"
         ".maptitle{position:absolute;top:10px;left:10px;z-index:2;background:rgba(255,255,255,.92);"
         "border:1px solid #e2e2e7;border-radius:8px;padding:6px 10px;font-size:12px;"
         "box-shadow:0 2px 8px rgba(0,0,0,.08)}"
@@ -115,7 +115,7 @@ def main():
         ".row{display:flex;align-items:center;gap:8px;padding:4px 10px}"
         ".row:hover{background:#f3f4f6}"
         ".dot{width:14px;height:14px;flex:none;border-radius:50%;border:1px solid rgba(0,0,0,.12)}"
-        ".row .nm{flex:1;font-size:11.5px;line-height:1.15;min-width:0}"
+        ".rname{flex:1;font-size:11.5px;line-height:1.15;min-width:0;color:#1f2328;opacity:1;font-weight:600}"
         ".row a{flex:none;font-size:10px;color:#2563eb;text-decoration:none;font-weight:600}"
         ".legend{display:flex;gap:12px;padding:8px 12px;border-bottom:1px solid #e2e2e7;font-size:10.5px}"
         ".legend span{display:flex;align-items:center;gap:5px}"
@@ -130,7 +130,7 @@ def main():
         hexc = HEX.get(color, GREY)
         rows.append(
             '<div class="row"><span class="dot" style="background:%s"></span>'
-            '<span class="nm">%d. %s</span>%s</div>'
+            '<span class="rname">%d. %s</span>%s</div>'
             % (
                 hexc,
                 int(f["ref"]),
