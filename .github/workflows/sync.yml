@@ -28,7 +28,6 @@ jobs:
         run: python bake.py /tmp/index.html
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_DB_ID: ${{ vars.NOTION_DB_ID }}
 
       - name: Publish to gh-pages
         run: |

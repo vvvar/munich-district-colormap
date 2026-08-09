@@ -6,7 +6,8 @@ import sys
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DB_ID = os.environ.get("NOTION_DB_ID") or "9680bc6275e249198244df1fc2bc7a08"
+DB_TITLE = "Munich Sub-Districts (110)"
+DB_ID = os.environ.get("NOTION_DB_ID")
 TOKEN = os.environ.get("NOTION_TOKEN", "")
 
 HEX = {"Red": "#e6194b", "Yellow": "#ffe119", "Green": "#3cb44b", "Grey": "#d3d9e0"}
@@ -15,8 +16,37 @@ TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 ATTRIB = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
 
+def _notion(path, body):
+    req = urllib.request.Request(
+        "https://api.notion.com/v1" + path,
+        data=json.dumps(body).encode(),
+        headers={
+            "Authorization": "Bearer %s" % TOKEN,
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req) as r:
+        return json.load(r)
+
+
+def find_db():
+    data = _notion("/search", {"query": DB_TITLE,
+                               "filter": {"value": "database", "property": "object"}})
+    for obj in data.get("results", []):
+        for t in obj.get("title", []):
+            if t.get("plain_text") == DB_TITLE:
+                return obj["id"]
+    return None
+
+
 def fetch_colors():
     if not TOKEN:
+        return {}
+    db_id = DB_ID or find_db()
+    if not db_id:
+        print("Notion DB %r not found; using no colors" % DB_TITLE)
         return {}
     colors = {}
     cursor = None
@@ -24,25 +54,15 @@ def fetch_colors():
         body = {"page_size": 100}
         if cursor:
             body["start_cursor"] = cursor
-        req = urllib.request.Request(
-            "https://api.notion.com/v1/databases/%s/query" % DB_ID,
-            data=json.dumps(body).encode(),
-            headers={
-                "Authorization": "Bearer %s" % TOKEN,
-                "Notion-Version": "2022-06-28",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req) as r:
-            data = json.load(r)
+        data = _notion("/databases/%s/query" % db_id, body)
         for row in data["results"]:
             props = row["properties"]
-            nr = props["Nr"]["number"]
+            code = props["Code"]["rich_text"]
+            key = code[0]["plain_text"] if code else None
             sel = props["Color"]["select"]
             note = "".join(t.get("plain_text", "") for t in props["Notes"]["rich_text"]).strip()
-            if nr is not None:
-                colors[str(int(nr))] = {
+            if key:
+                colors[key] = {
                     "color": sel["name"] if sel else None,
                     "note": note or None,
                 }
@@ -134,12 +154,18 @@ def compact(geojson):
 
 
 def main():
-    data = json.load(open(os.path.join(HERE, "stadtbezirke.geojson")))
+    data = json.load(open(os.path.join(HERE, "munich_bezirksteile_named.geojson")))
+    feats = data["features"]
+    for f in feats:
+        p = f["properties"]
+        p["ref"] = p["bt_nummer"]
+        names = p.get("os_names") or []
+        p["name"] = names[0] if names else "%s (unnamed)" % p["bt_nummer"]
+        p["label"] = p["name"] if not names else "%s %s" % (p["ref"], p["name"])
     compact(data)
     colors = fetch_colors()
     geojson = json.dumps(data, ensure_ascii=True, separators=(",", ":"))
 
-    feats = data["features"]
     labels = []
     rows = []
     for i, f in enumerate(feats):
@@ -156,12 +182,11 @@ def main():
         rows.append(
             '<div class="row" data-ref="%s"><div class="rh"><span class="dot" '
             'style="background:%s"></span>'
-            '<span class="rname">%d. %s</span>%s</div>%s</div>'
+            '<span class="rname">%s</span>%s</div>%s</div>'
             % (
                 ref,
                 dot,
-                int(ref),
-                f["properties"]["name"],
+                f["properties"]["label"],
                 '<a href="%s" target="_blank" rel="noopener">Maps</a>' % maps_url,
                 ('<div class="note">%s</div>' % info["note"]) if info.get("note") else "",
             )
@@ -269,7 +294,7 @@ def main():
         "layer.eachLayer(function(l){var p=l.feature.properties;byRef[p.ref]=l;"
         "l.options.color='#374151';l.options.weight=1;l.options.fillColor=COLOR[p.ref]||'transparent';"
         "l.options.fillOpacity=.35;l.setStyle(l.options);"
-        "l.bindTooltip('<b>'+p.ref+'. '+p.name+'</b>',{sticky:true});"
+        "l.bindTooltip('<b>'+p.ref+'\u00b7 '+p.name+'</b>',{sticky:true});"
         "l.on('mouseover',function(){l.setStyle({weight:1.8,color:'#111827',fillOpacity:.55});});"
         "l.on('mouseout',function(){l.setStyle({weight:1,color:'#374151',fillOpacity:.35});});"
         "l.on('click',function(){if(!drawMode)selectRow(p.ref);});});\n"
@@ -279,14 +304,14 @@ def main():
         "var l=byRef[r.dataset.ref];selectRow(r.dataset.ref);if(l)map.fitBounds(l.getBounds());});});\n"
         "var RATING={'#3cb44b':0,'#ffe119':1,'#e6194b':2,'#d3d9e0':3,'':4};\n"
         "function sortRows(mode){var rows=Array.prototype.slice.call(document.querySelectorAll('.row'));"
-        "rows.sort(function(a,b){var an=parseInt(a.dataset.ref,10),bn=parseInt(b.dataset.ref,10);"
-        "if(mode==='name'){var na=a.querySelector('.rname').textContent.replace(/^\\d+\\.\\s*/,''),"
-        "nb=b.querySelector('.rname').textContent.replace(/^\\d+\\.\\s*/,'');"
-        "var c=na.localeCompare(nb,'en');return c||an-bn;}"
+        "rows.sort(function(a,b){var ar=a.dataset.ref,br=b.dataset.ref,ord=ar<br?-1:ar>br?1:0;"
+        "if(mode==='name'){var na=a.querySelector('.rname').textContent.replace(/^[\\d.]+\\s*/,''),"
+        "nb=b.querySelector('.rname').textContent.replace(/^[\\d.]+\\s*/,'');"
+        "var c=na.localeCompare(nb,'en');return c||ord;}"
         "if(mode==='rating'){var ra=RATING.hasOwnProperty(COLOR[a.dataset.ref])?RATING[COLOR[a.dataset.ref]]:4,"
         "rb=RATING.hasOwnProperty(COLOR[b.dataset.ref])?RATING[COLOR[b.dataset.ref]]:4;"
-        "return (ra-rb)||(an-bn);}"
-        "return an-bn;});"
+        "return (ra-rb)||ord;}"
+        "return ord;});"
         "var list=document.getElementById('districts');"
         "rows.forEach(function(r){list.appendChild(r);});}\n"
         "document.getElementById('sort').addEventListener('change',function(){"
@@ -394,8 +419,8 @@ def main():
 
     panel = (
         '<header><h1>M\u00fcnchen</h1>'
-        '<p>Colors come from the \u201cMunich Districts Colors\u201d table '
-        'below. Click a row to zoom to that district.</p>'
+        '<p>Colors come from the \u201cMunich Sub-Districts (110)\u201d table '
+        'below. Click a row to zoom to that sub-district.</p>'
         '<button class="close" id="panelclose" aria-label="Close districts list">\u2715</button></header>'
         + '<div class="legend" style="position:static;border:none;box-shadow:none;padding:8px 12px;'
         'border-bottom:1px solid #e2e2e7">'
@@ -408,7 +433,7 @@ def main():
         '<option value="name">Alphabetical</option>'
         '<option value="rating">Rating</option></select></div>'
         + '<div id="districts">' + "".join(rows) + "</div>"
-        + "<footer>25 Stadtbezirke \u00b7 auto-synced from the table</footer>"
+        + "<footer>110 Stadtbezirksteile \u00b7 auto-synced from the table</footer>"
     )
 
     html = (
@@ -420,7 +445,7 @@ def main():
         "<style>\n%s\n</style>\n"
         "</head>\n<body>\n<div class=\"l\">\n<div class=\"map\">\n"
         '<div id="map"></div>\n'
-        '<div class="maptitle">M\u00fcnchen &middot; 25 Stadtbezirke</div>\n'
+        '<div class="maptitle">M\u00fcnchen &middot; 110 Stadtbezirksteile</div>\n'
         '<div class="legend"><span style="color:#e6194b">\u25cf No go</span>'
         '<span style="color:#ffe119">\u25cf Compromise</span>'
         '<span style="color:#d3d9e0">\u25cf Explore</span>'
