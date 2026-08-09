@@ -5,7 +5,7 @@ import sys
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DB_ID = os.environ.get("NOTION_DB_ID", "9680bc6275e249198244df1fc2bc7a08")
+DB_ID = os.environ.get("NOTION_DB_ID") or "9680bc6275e249198244df1fc2bc7a08"
 TOKEN = os.environ.get("NOTION_TOKEN", "")
 
 HEX = {"Red": "#e6194b", "Yellow": "#ffe119", "Green": "#3cb44b"}
