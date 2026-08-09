@@ -56,8 +56,8 @@
 | 11.3 | Milbertshofen-Am Hart | Milbertshofen | 1.63 | 48.184365, 11.576822 |
 | 12.1 | Schwabing-Freimann | Freimann, Neufreimann, Freimanner Heide, Grusonsiedlung, Haidpark, Kieferngarten | 8.94 | 48.207669, 11.607936 |
 | 12.2 | Schwabing-Freimann | Alt-Freimann, Auensiedlung, Fröttmaning, Gartenstadt Freimann, Großlappen, Kleinlappen, Kulturheim | 6.38 | 48.204900, 11.631471 |
-| 12.3 | Schwabing-Freimann | Domagkpark, Parkstadt Schwabing, Alte Heide, Berliner Viertel, Emilienhof, Freimann-Süd, Studentenstadt Freimann | 6.36 | 48.177650, 11.605698 |
-| 12.4 | Schwabing-Freimann | Schwabing, Viktoriaviertel | 1.30 | 48.167465, 11.587768 |
+| 12.3 | Schwabing-Freimann | Schwabing, Domagkpark, Parkstadt Schwabing, Alte Heide, Berliner Viertel, Emilienhof, Freimann-Süd, Studentenstadt Freimann | 6.36 | 48.177650, 11.605698 |
+| 12.4 | Schwabing-Freimann | Viktoriaviertel | 1.30 | 48.167465, 11.587768 |
 | 12.5 | Schwabing-Freimann | Biederstein | 0.46 | 48.166022, 11.598856 |
 | 12.6 | Schwabing-Freimann | Alt-Schwabing | 0.79 | 48.157577, 11.585154 |
 | 12.7 | Schwabing-Freimann | Kleinhesselohe | 0.92 | 48.156362, 11.597379 |

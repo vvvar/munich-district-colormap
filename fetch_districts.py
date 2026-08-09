@@ -173,27 +173,49 @@ def borough_of(bt_nummer):
         return None
 
 
+def existing_os_names():
+    """OSM names from the last successful run, keyed by bt_nummer."""
+    path = os.path.join(HERE, "munich_bezirksteile_named.geojson")
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    return {f["properties"]["bt_nummer"]: (f["properties"].get("os_names") or [])
+            for f in data["features"]}
+
+
 def build_features():
     print("Fetching official sub-districts from WFS ...", flush=True)
     bt = fetch_bezirksteile()
     print("  %d features" % len(bt["features"]), flush=True)
-    print("Fetching OSM named places from Overpass ...", flush=True)
-    osm = fetch_osm_names()
-    print("  %d named places" % len(osm), flush=True)
 
-    # name candidates per feature, keep the best (lowest priority number)
-    candidates = {f["properties"]["bt_nummer"]: {} for f in bt["features"]}
-    assigned = 0
-    for p in osm:
+    candidates = {}
+    try:
+        print("Fetching OSM named places from Overpass ...", flush=True)
+        osm = fetch_osm_names()
+        if len(osm) < 50:
+            raise RuntimeError("only %d named places returned" % len(osm))
+        print("  %d named places" % len(osm), flush=True)
+        # name candidates per feature, keep the best (lowest priority number)
+        candidates = {f["properties"]["bt_nummer"]: {} for f in bt["features"]}
+        for p in osm:
+            for f in bt["features"]:
+                code = f["properties"]["bt_nummer"]
+                geom = f["geometry"]
+                if polygon_contains(p["lon"], p["lat"], geom):
+                    cur = candidates[code].get(p["name"])
+                    if cur is None or NAME_PRIORITY[p["place"]] < NAME_PRIORITY[cur[1]]:
+                        candidates[code][p["name"]] = (p["place"], NAME_PRIORITY[p["place"]])
+                    break
+    except Exception as e:
+        old = existing_os_names()
+        if old is None:
+            raise
+        print("OSM fetch failed (%s); reusing names from committed data" % e, flush=True)
+        candidates = {}
         for f in bt["features"]:
             code = f["properties"]["bt_nummer"]
-            geom = f["geometry"]
-            if polygon_contains(p["lon"], p["lat"], geom):
-                cur = candidates[code].get(p["name"])
-                if cur is None or NAME_PRIORITY[p["place"]] < NAME_PRIORITY[cur[1]]:
-                    candidates[code][p["name"]] = (p["place"], NAME_PRIORITY[p["place"]])
-                assigned += 1
-                break
+            candidates[code] = {n: ("fallback", 9) for n in old.get(code, [])}
 
     for f in bt["features"]:
         props = f["properties"]
